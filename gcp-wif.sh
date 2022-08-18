@@ -6,9 +6,10 @@ SERVICE_ACCOUNT_NAME="Github-Actions-decenteralized-app"
 PROJECT_ID="divine-anarchy-356723"
 FILE_PATH="build/wif-${REPO}.json"
 ROLES=(
-	"artifactregistry.repositories.uploadArtifacts"
+	"artifactregistry.admin"
 	"iam.serviceAccountUser"
 	"run.admin"
+	"cloudsql.admin"
 )
 
 REPO_PATH="${ORG}/${REPO}"
@@ -23,13 +24,6 @@ gcloud iam service-accounts create "${SERVICE_ACCOUNT}" \
 echo "Enable IAM Credential API for project"
 gcloud services enable iamcredentials.googleapis.com \
 	--project "${PROJECT_ID}"
-
-for role in "${ROLES[@]}"; do
-	echo "Add role ${role} to service account"
-	gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-		--member "serviceAccount:${SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com" \
-		--role "${role}" > /dev/null 2>&1
-done
 
 echo "Create workload identity pool"
 gcloud iam workload-identity-pools create "${WORKLOAD_POOL}" \
@@ -51,6 +45,13 @@ gcloud iam workload-identity-pools providers create-oidc "${PROVIDER}" \
 	--display-name="${PROVIDER}" \
 	--attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository" \
 	--issuer-uri="https://token.actions.githubusercontent.com"
+
+for role in "${ROLES[@]}"; do
+	echo "Add role ${role} to service account"
+	gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+		--member "serviceAccount:${SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com" \
+		--role "roles/${role}" > /dev/null 2>&1
+done
 
 echo "Adding role: roles/iam.workloadIdentityUser for GitHub Repo path"
 gcloud iam service-accounts add-iam-policy-binding "${SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com" \
